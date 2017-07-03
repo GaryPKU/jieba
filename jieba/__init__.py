@@ -81,6 +81,7 @@ class Tokenizer(object):
         else:
             self.dictionary = _get_abs_path(dictionary)
         self.FREQ = {}
+        self.REGEX = {}
         self.total = 0
         self.user_word_tag_tab = {}
         self.initialized = False
