@@ -48,6 +48,29 @@ re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 def setLogLevel(log_level):
     global logger
     default_logger.setLevel(log_level)
+    
+def support_regex(func):
+    def wrapper(self, sentence, **kwargs):
+        if not self.REGEX:
+            return func(self, sentence, **kwargs)
+        regex_list = {}
+        for pattern in self.REGEX:
+            regex_object = re.compile(pattern)
+            matches = regex_object.finditer(sentence)
+            if not matches:
+                continue
+            for item in matches:
+                points = item.span()
+                sentence = sentence[:points[0]] + ' ' * (points[1] - points[0]) + sentence[points[1]:]
+                regex_list[points[0]] = points[1]
+        DAG = func(self, sentence, **kwargs)
+        for start, end in regex_list.items():
+            DAG[start] = [end - 1]
+            for index in range(start + 1, end):
+                del (DAG[index])
+        return DAG
+
+    return wrapper
 
 class Tokenizer(object):
 
@@ -172,9 +195,12 @@ class Tokenizer(object):
         route[N] = (0, 0)
         logtotal = log(self.total)
         for idx in xrange(N - 1, -1, -1):
+            if idx not in DAG:
+                continue
             route[idx] = max((log(self.FREQ.get(sentence[idx:x + 1]) or 1) -
                               logtotal + route[x + 1][0], x) for x in DAG[idx])
 
+    @support_regex
     def get_DAG(self, sentence):
         self.check_initialized()
         DAG = {}
@@ -409,6 +435,19 @@ class Tokenizer(object):
             wfrag = word[:ch + 1]
             if wfrag not in self.FREQ:
                 self.FREQ[wfrag] = 0
+    
+    def add_regex(self, regex, freq=None, tag=None):
+        """
+        Add a regex rule to regex dictionary.
+
+        freq and tag can be omitted, freq defaults to be a calculated value
+        that ensures the word can be cut out.
+        """
+        self.check_initialized()
+        regex = strdecode(regex)
+        freq = int(freq) if freq is not None else self.suggest_freq(regex, False)
+        self.REGEX[regex] = freq
+        self.total += freq
 
     def del_word(self, word):
         """
@@ -497,6 +536,7 @@ dt = Tokenizer()
 
 get_FREQ = lambda k, d=None: dt.FREQ.get(k, d)
 add_word = dt.add_word
+add_regex = dt.add_regex
 calc = dt.calc
 cut = dt.cut
 lcut = dt.lcut
