@@ -437,18 +437,24 @@ class Tokenizer(object):
             if wfrag not in self.FREQ:
                 self.FREQ[wfrag] = 0
     
-    def add_regex(self, regex, freq=None, tag=None):
+    def add_regex(self, regex, separator='', freq=None, tag=None):
         """
         Add a regex rule to regex dictionary.
-
+    
+        separator includes all new separator excluding +#&\._
         freq and tag can be omitted, freq defaults to be a calculated value
         that ensures the word can be cut out.
         """
+        global re_han_default
         self.check_initialized()
         regex = strdecode(regex)
         freq = int(freq) if freq is not None else self.suggest_freq(regex, False)
         self.REGEX[regex] = freq
         self.total += freq
+        if separator:
+            original_pattern = re_han_default.pattern
+            re_han_default = re.compile(
+                original_pattern[:-3] + separator + original_pattern[len(original_pattern) - 3:])
 
     def del_word(self, word):
         """
